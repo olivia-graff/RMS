@@ -1,0 +1,35 @@
+import postproc
+import glob
+import pandas as pd
+
+#Define anaylsis folder
+analysis_folder ='/mnt/gpfs/backup/hwind/Analysis/'
+
+#Get all of the Hermine analysis from folder
+analysis_list = glob.glob(analysis_folder + '*')
+
+#Initialize a list of the historical analysis data
+historical_analysis_data = list()
+
+
+#Looping through all analysis in list
+for analysis in analysis_list:
+    #Create an Analysis from the analysis folder, defined as a
+    try:
+        a = postproc.analysis.Analysis(analysis)
+    except ValueError:
+        continue
+
+    #For analysis that are historical, append the stormname, year, month, day, hour, and minute.
+    #for variables hour and minute, Zfill assures that the variable prints as two digits.
+    if a.type == 'operational':
+        t = (a.stormname, a.year, a.month, a.day, str(a.hour).zfill(2) + str(a.minute).zfill(2))
+        historical_analysis_data.append(t)
+
+df = pd.DataFrame(historical_analysis_data, columns = ['stormname', 'year', 'month', 'day', 'time'])
+
+df = df.sort_values(by=['year', 'month', 'day', 'time'])
+
+df = df.drop_duplicates()
+
+df.to_csv('hermine.csv',index=False)
