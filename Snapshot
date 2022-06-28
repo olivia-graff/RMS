@@ -1,0 +1,177 @@
+import postproc
+import pandas as pd
+import numpy as np
+
+
+# Create snapshot folder defined as ss
+ss = postproc.snapshot.from_analysis('home/Michael201810101800Okozar2018-10-10190237')
+
+#store headers as obs_headers from snapshot observations
+obs_headers = list(ss.observations)
+#store headers as trk_headers from snapshot track
+trk_headers = list(ss.track)
+
+#assign time varible to get time values from dataframe
+time = ss.observations.datetime.values
+
+#import max and min times
+begin_time = np.min(time)
+end_time = np.max(time)
+
+#Time range between the end time and the begin time
+time_difference = end_time - begin_time
+
+time_difference = time_difference / np.timedelta64(1, 'm')
+
+print('The difference is ' +str(time_difference) + ' minutes.')
+
+#Observations values for metar
+obs = ss.observations
+metardf = obs[obs.platform_name == 'METAR'].copy().sort_values('windspeed_marine1min')
+
+#Define variables of max wind speeds, station id, latitude, and longitude for METAR initial value
+max_windspeed_metar = metardf.windspeed_marine1min.values[-1]
+stationid_metar = metardf.station_id.values[-1]
+lat_metar = metardf.latitude.values[-1]
+lon_metar = metardf.longitude.values[-1]
+
+#convert m/s to ft/s
+max_windspeed_metar_fts = max_windspeed_metar * 3.28084
+
+print(max_windspeed_metar, stationid_metar, lat_metar, lon_metar)
+print(max_windspeed_metar_fts)
+
+#oberservation values for CMAN
+cmandf = obs[obs.platform_name == 'CMAN'].copy().sort_values('windspeed_marine1min')
+
+#Define variables of max wind speeds, station id, latitude, and longitude for CMAN initial value
+max_windspeed_cman = cmandf.windspeed_marine1min.values[-1]
+stationid_cman = cmandf.station_id.values[-1]
+lat_cman = cmandf.latitude.values[-1]
+lon_cman= cmandf.longitude.values[-1]
+
+#convert m/s to ft/s
+max_windspeed_cman_fts = max_windspeed_cman * 3.28084
+
+print(max_windspeed_cman, stationid_cman, lat_cman, lon_cman)
+print(max_windspeed_cman_fts)
+
+#Oberservation values for ASOS
+asosdf = obs[obs.platform_name == 'ASOS'].copy().sort_values('windspeed_marine1min')
+
+#Define variables of max wind speeds, station id, latitude, and longitude for ASOS initial value
+max_windspeed_asos = asosdf.windspeed_marine1min.values[-1]
+stationid_asos = asosdf.station_id.values[-1]
+lat_asos = asosdf.latitude.values[-1]
+lon_asos = asosdf.longitude.values[-1]
+
+#convert m/s to ft/s
+max_windspeed_asos_fts = max_windspeed_asos * 3.28084
+
+print(max_windspeed_asos, stationid_asos, lat_asos, lon_asos)
+print(max_windspeed_asos_fts)
+
+#Touples for METAR, ASOS, CMAN
+t_metar = (max_windspeed_metar_fts, stationid_metar, lat_metar, lon_metar)
+t_asos = (max_windspeed_asos_fts, stationid_asos, lat_asos, lon_asos)
+t_cman = (max_windspeed_cman_fts, stationid_cman, lat_cman, lon_cman)
+
+#Input each platform into a new dataframe
+data_list = [t_metar, t_asos, t_cman]
+#Structure the pandas data frame from the data_list, and assign column names
+df = pd.DataFrame(data_list, columns = ['max_windspeed(ft/s)', 'station ID', 'latitude', 'longitude'])
+
+print(df)
+
+#Sort observations
+obs = obs.sort_values('windspeed_marine1min')
+#Time, speed, and and station id of overall max wind
+max_wind_time = obs.datetime.values[-1]
+max_wind_speed = obs.windspeed_marine1min.values[-1]
+max_wind_stationid = obs.station_id.values[-1]
+
+print(max_wind_time, max_wind_speed, max_wind_stationid)
+print(ss.track)
+
+#drop columns: index, kind, speed, and bearing
+track = ss.track.drop(columns = ['index', 'kind', 'speed', 'bearing'])
+
+print(track)
+
+#set a new track index of datetime
+track = track.set_index('datetime')
+
+print(track)
+
+#interpolate a track point for every 30 second interval in time range
+track = track.resample('30s').interpolate(method = 'linear')
+
+#longitude/latitude at max wind
+max_lon = track[track.index == max_wind_time].longitude.values[0]
+max_lat = track[track.index == max_wind_time].latitude.values[0]
+
+print(max_lat, max_lon)
+
+#Parse KPAM observations into a new datafram
+KPAM_df = obs[obs.station_id == 'KPAM'].copy()
+#Load csv file into csv file michaelss.csv
+KPAM_df.to_csv('michaelss.csv',index=False)
+#read in the csv file
+KPAM_csv = pd.read_csv('michaelss.csv')
+#calculate the mean and standard deviation of KPAM obs
+mean_obs = KPAM_csv['windspeed_marine1min'].mean()
+std_obs = KPAM_csv['windspeed_marine1min'].std()
+
+print(mean_obs, std_obs)
+
+#Create a time series plot with matplotlib
+#import matplotlib
+import matplotlib.pyplot as plt
+
+#Set values for x and y on plot
+x = KPAM_csv['windspeed_marine1min']
+y = KPAM_csv['datetime']
+
+#plot x and y values
+plt.plot(x,y)
+
+#input axis labels/title
+plt.xlabel('time')
+plt.ylabel('windspeed_marine1min')
+plt.title('KPAM Time vs. Observed Wind Speed')
+plt.show()
+
+#save plot as a png
+plt.savefig('KPAM.png')
+
+#####################################################################################################
+# Consolidated method 
+#####################################################################################################
+
+data_list_plat = []
+
+def platform_name(platname, list_pn):
+    platname_df = obs[obs.platform_name == platname].copy().sort_values('windspeed_marine1min')
+    max_windspeed_pn = platname_df.windspeed_marine1min.values[-1]
+    stationid_pn = platname_df.station_id.values[-1]
+    lat_pn = platname_df.latitude.values[-1]
+    lon_pn = platname_df.longitude.values[-1]
+    max_windspeed_pn_fts = max_windspeed_pn * 3.28084
+
+    print(max_windspeed_pn, stationid_pn, lat_pn, lon_pn)
+    print(max_windspeed_pn_fts)
+
+    t_pn = (max_windspeed_pn_fts, stationid_pn, lat_pn, lon_pn)
+    list_pn.append(t_pn)
+
+platform_name('ASOS', data_list_plat)
+platform_name('CMAN', data_list_plat)
+platform_name('METAR', data_list_plat)
+
+df_platname = pd.DataFrame(data_list_plat, columns = ['max_windspeed(ft/s)', 'station ID', 'latitude', 'longitude'])
+print(df_platname)
+
+
+
+
+
